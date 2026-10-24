@@ -12,9 +12,11 @@ export function assignPoses(poses:Pose[],previous:(number|null)[]):(Pose|null)[]
  return out;
 }
 export class PoseControls {
+ singlePlayer=false;
  inputs=[neutral(),neutral()];poses:(Pose|null)[]=[null,null];positions:(number|null)[]=[null,null];baseline:(Baseline|null)[]=[null,null];samples:Baseline[][]=[[],[]];stage:'idle'|'standing'|'leaning'|'ready'='idle';lastSeen=[0,0];previousWrists:number[][]=[[],[]];lastJump=[0,0];lastThrow=[0,0];previousHip=[0,0];previousTime=0;confidence=[0,0];ranges=[.2,.2];leanLeft=[0,0];leanRight=[0,0];
- begin(){this.stage='standing';this.samples=[[],[]];this.baseline=[null,null];this.ranges=[.2,.2];this.leanLeft=[0,0];this.leanRight=[0,0];}
- update(poses:Pose[],now:number,sensitivity:number){const dt=clamp((now-this.previousTime)/1000,.01,.15);this.previousTime=now;this.poses=assignPoses(poses,this.positions);
+ begin(){this.stage='standing';this.samples=[[],[]];this.baseline=[null,null];this.ranges=[.2,.2];this.leanLeft=[0,0];this.leanRight=[0,0];this.positions=[null,null];this.inputs=[neutral(),neutral()];this.previousWrists=[[],[]];this.previousHip=[0,0];this.lastSeen=[0,0];}
+ update(poses:Pose[],now:number,sensitivity:number){const dt=clamp((now-this.previousTime)/1000,.01,.15);this.previousTime=now;
+ this.poses=this.singlePlayer?[poses.filter(reliable).sort((a,b)=>Math.abs(metrics(a).x-(this.positions[0]??.5))-Math.abs(metrics(b).x-(this.positions[0]??.5)))[0]??null,null]:assignPoses(poses,this.positions);
  this.poses.forEach((pose,i)=>{if(!pose){this.inputs[i]={...neutral(),tracked:false};this.confidence[i]=0;this.previousWrists[i]=[];this.previousHip[i]=0;return;}const m=metrics(pose);this.positions[i]=m.x;this.lastSeen[i]=now;this.confidence[i]=[11,12,23,24,25,26,27,28].reduce((sum,n)=>sum+(pose[n].visibility??0),0)/8;
  if(this.stage==='standing'&&this.samples[i].length<50){this.samples[i].push({...m,range:.3});if(this.samples[i].length===50){const rows=this.samples[i];this.baseline[i]={lean:0,hipY:0,shoulderY:0,leg:0,torso:0,range:.3};for(const key of ['lean','hipY','shoulderY','leg','torso'] as const)this.baseline[i]![key]=rows.reduce((sum,r)=>sum+r[key],0)/rows.length;}}
  const base=this.baseline[i];if(!base){this.inputs[i]={...neutral(),tracked:false};return;}
