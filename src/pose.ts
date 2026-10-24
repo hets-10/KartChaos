@@ -13,8 +13,23 @@ export function assignPoses(poses:Pose[],previous:(number|null)[]):(Pose|null)[]
 }
 export class PoseControls {
  singlePlayer=false;
+ startIn:number|null=null;private readySince:number|null=null;private lastCalibrationCheck:number|null=null;private startIssued=false;
  inputs=[neutral(),neutral()];poses:(Pose|null)[]=[null,null];positions:(number|null)[]=[null,null];baseline:(Baseline|null)[]=[null,null];samples:Baseline[][]=[[],[]];stage:'idle'|'standing'|'leaning'|'ready'='idle';lastSeen=[0,0];previousWrists:number[][]=[[],[]];lastJump=[0,0];lastThrow=[0,0];previousHip=[0,0];previousTime=0;confidence=[0,0];ranges=[.2,.2];leanLeft=[0,0];leanRight=[0,0];
- begin(){this.stage='standing';this.samples=[[],[]];this.baseline=[null,null];this.ranges=[.2,.2];this.leanLeft=[0,0];this.leanRight=[0,0];this.positions=[null,null];this.inputs=[neutral(),neutral()];this.previousWrists=[[],[]];this.previousHip=[0,0];this.lastSeen=[0,0];}
+ begin(){this.stage='standing';this.samples=[[],[]];this.baseline=[null,null];this.ranges=[.2,.2];this.leanLeft=[0,0];this.leanRight=[0,0];this.positions=[null,null];this.inputs=[neutral(),neutral()];this.previousWrists=[[],[]];this.previousHip=[0,0];this.lastSeen=[0,0];this.confidence=[0,0];this.startIn=null;this.readySince=null;this.lastCalibrationCheck=null;this.startIssued=false;}
+ /** Advance without mouse clicks, requiring fresh tracking throughout the ready countdown. */
+ advanceCalibration(slots:number[],now:number,active=true){
+  if(this.lastCalibrationCheck!==null&&now-this.lastCalibrationCheck>350)this.readySince=null;
+  this.lastCalibrationCheck=now;
+  const visible=active&&slots.length>0&&slots.every(i=>this.baseline[i]!==null&&this.inputs[i].tracked&&this.confidence[i]>.55&&this.lastSeen[i]>0&&now-this.lastSeen[i]<=350);
+  if(!visible||this.startIssued){this.readySince=null;this.startIn=null;return false;}
+  if(this.stage==='standing'){this.stage='leaning';return false;}
+  if(this.stage==='leaning'&&slots.every(i=>this.leanLeft[i]>.2&&this.leanRight[i]>.2))this.stage='ready';
+  if(this.stage!=='ready')return false;
+  this.readySince??=now;
+  this.startIn=Math.max(0,Math.ceil((3000-(now-this.readySince))/1000));
+  if(this.startIn>0)return false;
+  this.startIssued=true;return true;
+ }
  update(poses:Pose[],now:number,sensitivity:number){const dt=clamp((now-this.previousTime)/1000,.01,.15);this.previousTime=now;
  this.poses=this.singlePlayer?[poses.filter(reliable).sort((a,b)=>Math.abs(metrics(a).x-(this.positions[0]??.5))-Math.abs(metrics(b).x-(this.positions[0]??.5)))[0]??null,null]:assignPoses(poses,this.positions);
  this.poses.forEach((pose,i)=>{if(!pose){this.inputs[i]={...neutral(),tracked:false};this.confidence[i]=0;this.previousWrists[i]=[];this.previousHip[i]=0;return;}const m=metrics(pose);this.positions[i]=m.x;this.lastSeen[i]=now;this.confidence[i]=[11,12,23,24,25,26,27,28].reduce((sum,n)=>sum+(pose[n].visibility??0),0)/8;

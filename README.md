@@ -1,6 +1,8 @@
 # Kart Chaos
 
-**Your Body. Your Kart. Total Chaos.** A playable local two-player 3D island racer with keyboard and webcam body controls, horizontal split screen, three laps, drift boosts, and five items.
+**Small karts. Big rivalries.** A local 3D arcade racer with body or keyboard controls, an AI opponent, two-player split screen, free practice, and a hands-on driving school.
+
+The Racing Club UI includes original vector kart illustrations, a three-circuit selector on the title screen, track briefings, named paint finishes, illustrated power-ups and compact race instruments. The garage shows the actual keyboard bindings or body gestures. Results lead with a podium and race times, with lap comparisons and statistics in an expandable report. The cream, dark teal, coral and lime palette carries through setup, pause, controls and results. Artwork is local; no remote fonts or image services are required. The covered 3D world stops rendering in the title screen and garage.
 
 ## Run
 
@@ -19,7 +21,17 @@ npm run build   # TypeScript check + production dist/
 npm run preview # serve production build locally
 ```
 
-Choose **Let's Race**, enter names, choose one of six kart colors, and independently select keyboard or camera for each player. Camera players pass standing and two-direction lean calibration before racing. The first player to finish three laps wins; the other racer can finish and record their time. Race Again resets the simulation without a page refresh.
+Choose **Let's Race**, select a mode and circuit, enter names, choose one of six kart colors, and select keyboard or camera for each racer. Camera setup is hands-free after clicking **Calibrate Camera**: step back, hold still, then lean both ways. Each step advances automatically. Once all camera racers are calibrated and visible, a three-second ready countdown leads into the race countdown. Lost tracking or leaving the active tab resets the ready countdown, preserving calibration. The first player to finish three laps wins; the other racer can finish and record their time. Race Again resets the simulation without a page refresh.
+
+## Modes and circuits
+
+- **Solo race:** Circuit Bot follows the same kart physics, with easy, normal and hard decision-making. It steers, drifts, uses items and avoids hazards.
+- **Two players:** Local horizontal split screen with independent keyboard or body controls.
+- **Practice:** Empty track, unlimited laps and refilling items. Select any power-up and end the session when ready.
+- **Driving school:** Four interactive lessons teach steering, drift boosts, jumping and item use.
+- **Sunset Circuit:** Wide coastal bends; **Copper Canyon:** tight red-rock switchbacks; **Aurora Run:** longer straights beneath a violet sky.
+
+Settings include saved keyboard remapping, volume, body sensitivity, camera preview, reduced motion and a high-contrast HUD. Results include lap comparisons, speed, drift/boost time, road accuracy, collisions, pickups and item statistics. Names, colours and settings are stored in the current browser.
 
 ## Controls
 
@@ -41,9 +53,9 @@ Drift for at least 0.55 seconds, then release to gain a boost. Longer drifts cha
 - **Banana:** Drops a curved obstacle behind you for the opponent to hit.
 - **Shield:** Blocks one attack or expires after nine seconds.
 - **Turbo:** Four seconds of extra speed.
-- **Lightning:** Slows the opponent for three seconds unless shielded.
+- **Lightning:** Slows the opponent for 2.5 seconds unless shielded.
 
-Pickups respawn after seven seconds. Chaos Mode increases speed and pickup frequency. Normal mode takes roughly two minutes per race. Sound effects and engine audio are synthesized with Web Audio; volume and mute are in Settings. There is no background music.
+Pickups respawn after seven seconds. Trailing racers receive better odds of recovery items; leading racers get more defensive options. Item cooldowns and brief protection after a hit prevent rapid repeated attacks. Chaos Mode increases speed and pickup frequency. Normal mode takes roughly two minutes per race. Sound effects and engine audio are synthesized with Web Audio; volume and mute are in Settings. There is no background music.
 
 ## Computer vision
 
@@ -51,7 +63,7 @@ Pickups respawn after seven seconds. Chaos Mode increases speed and pickup frequ
 
 Inference runs in a dedicated worker on transferred ImageBitmaps, throttled to at most 25 requests/second with only one frame in flight. CPU inference keeps it separate from the rendering GPU. The actual rate depends on the machine. The UI displays measured tracking FPS.
 
-The mirrored preview assigns Player 1 to the left zone and Player 2 to the right. Position history and zone gating maintain identity across reordered detections. Players should **not cross zones**; ambiguity causes lost tracking rather than swapping identities. Visible shoulders, hips, knees, and ankles are required. Calibration averages 50 standing frames, then measures comfortable lean in both directions. Steering uses shoulder/hip torso angle, a dead zone, sensitivity adjustment and exponential smoothing. Squats use leg compression and hip drop. Jumps require both shoulders and hips to rise with upward velocity, not merely raised hands. Throws use shoulder-relative wrist velocity, elbow extension and a cooldown. Missing or stale detections neutralize steering/gestures and reduce speed safely.
+In two-player mode, the mirrored preview assigns Player 1 to the left zone and Player 2 to the right. Single-player modes use a centered full-body view. Position history and zone gating maintain identity across reordered detections. Players should **not cross zones**; ambiguity causes lost tracking rather than swapping identities. Visible shoulders, hips, knees, and ankles are required. Calibration averages 50 standing frames, then measures comfortable lean in both directions. Steering uses shoulder/hip torso angle, a dead zone, sensitivity adjustment and exponential smoothing. Squats use leg compression and hip drop. Jumps require both shoulders and hips to rise with upward velocity, not merely raised hands. Throws use shoulder-relative wrist velocity, elbow extension and a cooldown. Missing or stale detections neutralize steering/gestures and reduce speed safely.
 
 ## Tracking diagnostic
 
@@ -63,7 +75,7 @@ Real two-person camera tracking requires manual validation; automated synthetic-
 
 1. Use Chrome on localhost, enable camera access, and position two players with their entire bodies visible in even lighting. Leave room to lean and hop.
 2. Choose camera for both players. Player 1 stands in the left half of the mirrored preview; Player 2 stands in the right.
-3. Hold still until both standing calibrations reach 100%; then lean left and right separately until the start button enables. Verify colors, labels and confidence in the skeleton overlay.
+3. Hold still until both standing calibrations reach 100%; the lean test opens automatically. Lean left and right separately, then return to a comfortable stance. Verify that the ready countdown starts without touching the computer. Step out of frame during that countdown and confirm it restarts from three when both players return. Verify colors, labels and confidence in the skeleton overlay.
 4. Lean one person at a time: only their meter and kart should respond, in the same direction as the mirrored preview.
 5. Squat while leaning, stand to release a drift boost, hop once, and throw after collecting a box. Check cooldowns and that casual arm raises do not jump.
 6. Leave the frame: the correct player should get a warning and slow safely. Return to the same zone and verify identity is retained.
@@ -77,13 +89,17 @@ Real two-person camera tracking requires manual validation; automated synthetic-
 - `src/pose.ts`: identity assignment, confidence gates, calibration and gesture extraction.
 - `src/vision.worker.ts`, `src/camera.ts`: local MediaPipe inference, camera lifecycle and skeleton preview. `scripts/prepare-worker.mjs` bundles a classic worker before dev/build for the MediaPipe WASM loader.
 - `src/App.tsx`: React menus, player setup, HUD, pause/results and keyboard input.
-- `src/audio.ts`: original synthesized sound effects.
+- `src/audio.ts`, `src/effects.ts`: layered synthesized audio and pooled particle effects.
+- `src/Art.tsx`, `src/game-ui.css`: original vector artwork and Racing Club visual design.
+- `src/RacePresentation.tsx`, `src/race-club.css`: circuit selection, track notes, control legends and finish podium.
+- `src/tracks.ts`: three circuit layouts and palettes.
+- `src/preferences.ts`, `src/Settings.tsx`, `src/Results.tsx`: saved controls, accessibility and session statistics.
 - `src/game.test.ts`: deterministic simulation and synthetic-landmark tests.
 
 ## Verification completed
 
-- 16 automated tests passed: race lifecycle, ordered checkpoints, full race completion, pickups/items, drift boosts, collisions, lost tracking, synthetic pose assignment and gestures, camera-relative left/right projection, and tied-finish ranking.
-- TypeScript check and Vite production build passed; npm audit reported zero vulnerabilities.
+- 44 automated tests passed, including hands-free calibration and countdown resets, mixed keyboard/camera slots, AI completion on all three circuits at all three difficulties, practice refills, tutorial progression, item balance, key remapping and race lifecycle, ordered checkpoints, full race completion, pickups/items, drift boosts, collisions, lost tracking, synthetic pose assignment and gestures, camera-relative left/right projection, and tied-finish ranking.
+- TypeScript check and Vite production build passed.
 - Browser check completed a three-lap race in approximately 2:05, showed results with lap times, and restarted without refresh. Pause/resume preserved progress.
 - Final-build keyboard jump boost and Lightning activation were observed in the HUD; Lightning consumed the item and slowed the opponent.
 - Production MediaPipe diagnostic loaded the local model and completed blank-image inference in the worker.

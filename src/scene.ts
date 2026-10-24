@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {Race,wrap,type PlayerConfig} from './game';
 import {getTrack} from './tracks';
@@ -9,8 +10,8 @@ export class IslandScene {
  renderer:THREE.WebGLRenderer;scene=new THREE.Scene();cameras=[new THREE.PerspectiveCamera(65,1,.1,1800),new THREE.PerspectiveCamera(65,1,.1,1800)];curve:THREE.CatmullRomCurve3;karts:THREE.Group[]=[];wheels:THREE.Mesh[][]=[];shields:THREE.Mesh[]=[];flames:THREE.Mesh[]=[];sparks:THREE.Mesh[][]=[];boxes:THREE.Group[]=[];hazards=new Map<number,THREE.Mesh>();width=1;height=1;elapsed=0;cameraReady=false;resizeObserver:ResizeObserver;materials=new Map<string,THREE.MeshStandardMaterial>();
  constructor(public host:HTMLDivElement,public race:Race,configs:PlayerConfig[]){
  this.track=getTrack(race.trackId);
- this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));this.renderer.setClearColor(this.track.sky);this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;host.appendChild(this.renderer.domElement);this.scene.fog=new THREE.Fog(this.track.sky,220,700);
- this.scene.add(new THREE.HemisphereLight('#fff6d5','#487a6c',2.7));const sun=new THREE.DirectionalLight('#fff2ca',3.5);sun.position.set(100,180,50);this.scene.add(sun);
+ this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));this.renderer.setClearColor(this.track.sky);this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;host.appendChild(this.renderer.domElement);this.scene.fog=new THREE.Fog(this.track.sky,220,700);
+ this.scene.add(new THREE.HemisphereLight('#fff6d5','#487a6c',1.8));const sun=new THREE.DirectionalLight('#fff2ca',2.5);sun.position.set(100,180,50);this.scene.add(sun);
  this.curve=new THREE.CatmullRomCurve3(this.track.points.map(p=>new THREE.Vector3(...p)),true,'catmullrom',.38);
  this.buildIsland();this.particles=new Particles(this.scene);configs.forEach((c,i)=>this.makeKart(c.color,i));this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
  }
@@ -42,13 +43,47 @@ export class IslandScene {
  originals.forEach(o=>o.removeFromParent());const disposed=new Set<THREE.BufferGeometry>();originals.forEach(o=>{if(!disposed.has(o.geometry)){o.geometry.dispose();disposed.add(o.geometry);}});
  for(const [material,geometries] of batches){const merged=mergeGeometries(geometries,false);if(merged)this.scene.add(new THREE.Mesh(merged,material));geometries.forEach(g=>g.dispose());}
  }
- makeKart(color:string,id:number){const group=new THREE.Group();this.scene.add(group);this.karts.push(group);this.mesh(new THREE.BoxGeometry(2.2,.6,3.1),color,group,0,.8,0);this.mesh(new THREE.BoxGeometry(2.5,.35,.45),'#243343',group,0,.55,1.8);this.mesh(new THREE.BoxGeometry(2.2,.25,.6),color,group,0,1.3,-1.3);this.mesh(new THREE.BoxGeometry(1,.85,1.1),'#283747',group,0,1.35,-.25);this.mesh(new THREE.SphereGeometry(.65,12,8),color,group,0,2.05,0);this.mesh(new THREE.BoxGeometry(1,.25,.2),'#1f3344',group,0,2.1,.55);
- const wheels:THREE.Mesh[]=[];for(const x of [-1.2,1.2])for(const z of [-1,1]){const w=this.mesh(new THREE.CylinderGeometry(.51,.51,.4,10),'#263441',group,x,.55,z);w.rotation.z=Math.PI/2;wheels.push(w);}this.wheels.push(wheels);
+ makeKart(color:string,id:number){
+ const group=new THREE.Group();this.scene.add(group);this.karts.push(group);
+ const body=(w:number,h:number,d:number,x:number,y:number,z:number)=>{
+  const m=this.mesh(new RoundedBoxGeometry(w,h,d,2,.12),color,group,x,y,z);m.name='paint';return m;
+ };
+ const shadow=new THREE.Mesh(new THREE.CircleGeometry(1.75,24),new THREE.MeshBasicMaterial({color:'#0c2635',transparent:true,opacity:.24,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.08;shadow.scale.set(.9,1.35,1);group.add(shadow);
+ this.mesh(new RoundedBoxGeometry(2.15,.25,3.35,2,.1),'#16313b',group,0,.55,0);
+ body(2.1,.45,2.9,0,.82,0);
+ const hood=body(1.55,.48,1.35,0,1.01,1.05);hood.rotation.x=-.12;
+ this.mesh(new THREE.BoxGeometry(.22,.035,1.25),'#fff2d4',hood,-.32,.25,0);
+ this.mesh(new RoundedBoxGeometry(2.55,.25,.35,2,.08),'#c4dcd2',group,0,.65,1.85);
+ this.mesh(new RoundedBoxGeometry(1.05,.85,.9,2,.16),'#183843',group,0,1.28,-.35);
+ for(const x of [-.7,.7])this.mesh(new THREE.BoxGeometry(.12,.65,.16),'#173641',group,x,1.1,-1.35);
+ const wing=body(2.65,.17,.58,0,1.46,-1.4);wing.rotation.x=.08;
+ this.mesh(new THREE.BoxGeometry(.2,.02,.58),'#fff2d4',wing,-.35,.095,0);
+ for(const x of [-1.24,1.24])body(.1,.35,.61,x,1.5,-1.4);
+ this.mesh(new RoundedBoxGeometry(.8,.8,.65,2,.18),'#fff2d4',group,0,1.55,-.08);
+ const helmet=this.mesh(new THREE.SphereGeometry(.63,20,14),color,group,0,2.19,-.08);helmet.name='paint';
+ this.mesh(new THREE.SphereGeometry(.645,20,10,0,Math.PI,Math.PI*.34,Math.PI*.27),'#163c4d',group,0,2.19,-.08);
+ this.mesh(new RoundedBoxGeometry(.16,.06,.74,2,.025),'#fff2d4',group,-.18,2.77,-.05);
+ const steering=this.mesh(new THREE.TorusGeometry(.35,.055,6,16),'#17343d',group,0,1.55,.66);steering.rotation.x=-.5;
+ for(const x of [-.4,.4]){
+  const arm=this.mesh(new THREE.CapsuleGeometry(.14,.47,3,8),'#fff2d4',group,x,1.54,.35);arm.rotation.x=-.85;
+  this.mesh(new THREE.SphereGeometry(.16,8,6),'#17343d',group,x*.78,1.53,.65);
+  const exhaust=this.mesh(new THREE.CylinderGeometry(.15,.15,.65,10),'#aac5c3',group,x,.59,-1.82);exhaust.rotation.x=Math.PI/2;
+ }
+ const numberCanvas=document.createElement('canvas');numberCanvas.width=128;numberCanvas.height=128;
+ const ctx=numberCanvas.getContext('2d')!;ctx.fillStyle='#fff2d4';ctx.beginPath();ctx.arc(64,64,54,0,Math.PI*2);ctx.fill();ctx.fillStyle='#173b40';ctx.font='italic 900 74px Arial';ctx.textAlign='center';ctx.fillText(String(id+1).padStart(2,'0'),62,91);
+ const number=new THREE.Mesh(new THREE.PlaneGeometry(.6,.6),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(numberCanvas),transparent:true,depthWrite:false}));number.rotation.x=-Math.PI/2;number.position.set(.29,1.28,1.12);group.add(number);
+ const wheels:THREE.Mesh[]=[];
+ for(const x of [-1.18,1.18])for(const z of [-1.03,1.08]){
+  const w=this.mesh(new THREE.CylinderGeometry(.55,.55,.48,16),'#142933',group,x,.59,z);w.rotation.z=Math.PI/2;
+  const hub=this.mesh(new THREE.CylinderGeometry(.27,.27,.5,12),'#9ab8b5',w);
+  this.mesh(new THREE.CylinderGeometry(.1,.1,.53,8),'#183843',hub);
+  wheels.push(w);
+ }this.wheels.push(wheels);
  const shield=new THREE.Mesh(new THREE.SphereGeometry(2.4,16,12),new THREE.MeshBasicMaterial({color:'#7aeeff',transparent:true,opacity:.22,wireframe:true}));shield.position.y=1;group.add(shield);this.shields.push(shield);
  const flame=this.mesh(new THREE.ConeGeometry(.5,2,8),'#ffcb57',group,0,.65,-2.3);flame.rotation.x=-Math.PI/2;flame.material=this.mat('#ffb94b',true);this.flames.push(flame);
  const sparks:THREE.Mesh[]=[];for(let j=0;j<12;j++){const s=this.mesh(new THREE.IcosahedronGeometry(.15),j%2?'#b9eaff':'#ffcf5a',group);s.material=this.mat(j%2?'#b9eaff':'#ffcf5a',true);sparks.push(s);}this.sparks.push(sparks);
  }
- setColors(configs:PlayerConfig[]){this.karts.forEach((g,i)=>{for(const j of [0,2,4]){const m=g.children[j] as THREE.Mesh;m.material=this.mat(configs[i].color);}});}
+ setColors(configs:PlayerConfig[]){this.karts.forEach((g,i)=>g.traverse(o=>{if(o instanceof THREE.Mesh&&o.name==='paint')o.material=this.mat(configs[i].color);}));}
  resize(){this.width=this.host.clientWidth;this.height=this.host.clientHeight;this.renderer.setSize(this.width,this.height);this.cameras.forEach(c=>{c.aspect=this.width/(this.height/(this.race.split?2:1));c.updateProjectionMatrix();});}
  render(dt:number,menu=false){const animated=this.race.phase==='racing';if(animated||menu)this.elapsed+=dt;const t=this.elapsed;
  this.trailTimer+=dt;const trail=this.trailTimer>.045;if(trail)this.trailTimer=0;
