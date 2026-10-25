@@ -6,6 +6,7 @@ import {getTrack} from './tracks';
 import {Particles} from './effects';
 const UP=new THREE.Vector3(0,1,0);
 export class IslandScene {
+ portraits:THREE.Sprite[]=[];photoSources:(string|undefined)[]=[];disposed=false;
  reducedMotion=false;particles!:Particles;lastEffect=0;trailTimer=0;track=getTrack('sunset');
  renderer:THREE.WebGLRenderer;scene=new THREE.Scene();cameras=[new THREE.PerspectiveCamera(65,1,.1,1800),new THREE.PerspectiveCamera(65,1,.1,1800)];curve:THREE.CatmullRomCurve3;karts:THREE.Group[]=[];wheels:THREE.Mesh[][]=[];shields:THREE.Mesh[]=[];flames:THREE.Mesh[]=[];sparks:THREE.Mesh[][]=[];boxes:THREE.Group[]=[];hazards=new Map<number,THREE.Mesh>();width=1;height=1;elapsed=0;cameraReady=false;resizeObserver:ResizeObserver;materials=new Map<string,THREE.MeshStandardMaterial>();
  constructor(public host:HTMLDivElement,public race:Race,configs:PlayerConfig[]){
@@ -13,7 +14,7 @@ export class IslandScene {
  this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));this.renderer.setClearColor(this.track.sky);this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;host.appendChild(this.renderer.domElement);this.scene.fog=new THREE.Fog(this.track.sky,220,700);
  this.scene.add(new THREE.HemisphereLight('#fff6d5','#487a6c',1.8));const sun=new THREE.DirectionalLight('#fff2ca',2.5);sun.position.set(100,180,50);this.scene.add(sun);
  this.curve=new THREE.CatmullRomCurve3(this.track.points.map(p=>new THREE.Vector3(...p)),true,'catmullrom',.38);
- this.buildIsland();this.particles=new Particles(this.scene);configs.forEach((c,i)=>this.makeKart(c.color,i));this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
+ this.buildIsland();this.particles=new Particles(this.scene);configs.forEach((c,i)=>this.makeKart(c.color,i));this.setColors(configs);this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
  }
  mat(color:string,emissive=false){const key=color+emissive;if(!this.materials.has(key))this.materials.set(key,new THREE.MeshStandardMaterial({color,roughness:.8,flatShading:true,...(emissive?{emissive:color,emissiveIntensity:.8}:{})}));return this.materials.get(key)!;}
  mesh(geometry:THREE.BufferGeometry,color:string,parent:THREE.Object3D=this.scene,x=0,y=0,z=0){const m=new THREE.Mesh(geometry,this.mat(color));m.position.set(x,y,z);parent.add(m);return m;}
@@ -83,7 +84,20 @@ export class IslandScene {
  const flame=this.mesh(new THREE.ConeGeometry(.5,2,8),'#ffcb57',group,0,.65,-2.3);flame.rotation.x=-Math.PI/2;flame.material=this.mat('#ffb94b',true);this.flames.push(flame);
  const sparks:THREE.Mesh[]=[];for(let j=0;j<12;j++){const s=this.mesh(new THREE.IcosahedronGeometry(.15),j%2?'#b9eaff':'#ffcf5a',group);s.material=this.mat(j%2?'#b9eaff':'#ffcf5a',true);sparks.push(s);}this.sparks.push(sparks);
  }
- setColors(configs:PlayerConfig[]){this.karts.forEach((g,i)=>g.traverse(o=>{if(o instanceof THREE.Mesh&&o.name==='paint')o.material=this.mat(configs[i].color);}));}
+ setColors(configs:PlayerConfig[]){this.karts.forEach((g,i)=>{
+  g.traverse(o=>{if(o instanceof THREE.Mesh&&o.name==='paint')o.material=this.mat(configs[i].color);});
+  const source=this.race.mode==='solo'&&i===1?undefined:configs[i].photo;
+  if(this.photoSources[i]===source)return;this.photoSources[i]=source;
+  const prior=this.portraits[i];if(prior){prior.removeFromParent();prior.material.map?.dispose();prior.material.dispose();delete this.portraits[i];}
+  if(!source)return;
+  const img=new Image();img.onload=()=>{
+   if(this.disposed||this.photoSources[i]!==source)return;
+   const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d')!;
+   ctx.fillStyle='#fff4d9';ctx.beginPath();ctx.arc(128,128,128,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(128,128,118,0,Math.PI*2);ctx.clip();ctx.drawImage(img,10,10,236,236);
+   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false,toneMapped:false}));sprite.position.set(0,2.75,-.08);sprite.scale.set(1.7,1.7,1);g.add(sprite);this.portraits[i]=sprite;
+  };img.src=source;
+ });}
  resize(){this.width=this.host.clientWidth;this.height=this.host.clientHeight;this.renderer.setSize(this.width,this.height);this.cameras.forEach(c=>{c.aspect=this.width/(this.height/(this.race.split?2:1));c.updateProjectionMatrix();});}
  render(dt:number,menu=false){const animated=this.race.phase==='racing';if(animated||menu)this.elapsed+=dt;const t=this.elapsed;
  this.trailTimer+=dt;const trail=this.trailTimer>.045;if(trail)this.trailTimer=0;
@@ -98,5 +112,5 @@ export class IslandScene {
  this.renderer.setScissorTest(true);
  if(menu){const camera=this.cameras[0];camera.aspect=this.width/this.height;camera.updateProjectionMatrix();camera.position.set(Math.sin(this.reducedMotion?.6:t*.045)*240,165,Math.cos(this.reducedMotion?.6:t*.045)*240);camera.lookAt(0,0,0);this.renderer.setViewport(0,0,this.width,this.height);this.renderer.setScissor(0,0,this.width,this.height);this.renderer.render(this.scene,camera);camera.aspect=this.width/(this.height/2);}else{const views=this.race.split?2:1;for(let i=0;i<views;i++){const viewHeight=i===0&&views===2?Math.ceil(this.height/2):Math.floor(this.height/views),y=i===0&&views===2?Math.floor(this.height/2):0;this.renderer.setViewport(0,y,this.width,viewHeight);this.renderer.setScissor(0,y,this.width,viewHeight);this.renderer.render(this.scene,this.cameras[i]);}}
  }
- dispose(){this.resizeObserver.disconnect();this.particles.dispose();const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();this.scene.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.LineSegments){geometries.add(o.geometry);(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>materials.add(m));}});geometries.forEach(g=>g.dispose());materials.forEach(m=>{if('map'in m)(m.map as THREE.Texture|null)?.dispose();m.dispose();});this.renderer.dispose();this.renderer.domElement.remove();}
+ dispose(){this.disposed=true;this.portraits.forEach(p=>{p.material.map?.dispose();p.material.dispose();});this.resizeObserver.disconnect();this.particles.dispose();const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();this.scene.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.LineSegments){geometries.add(o.geometry);(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>materials.add(m));}});geometries.forEach(g=>g.dispose());materials.forEach(m=>{if('map'in m)(m.map as THREE.Texture|null)?.dispose();m.dispose();});this.renderer.dispose();this.renderer.domElement.remove();}
 }

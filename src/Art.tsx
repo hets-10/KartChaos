@@ -3,10 +3,10 @@ import type {Item} from './game';
 import {getTrack,type TrackId} from './tracks';
 
 /** Original vector artwork: shared by the title screen, garage and race HUD. */
-export function KartArt({color='#ff6748',number=1}:{color?:string;number?:number}){
+export function KartArt({color='#ff6748',number=1,photo}:{color?:string;number?:number;photo?:string}){
  const id=useId().replace(/:/g,'');
  return <svg className="kart-art" viewBox="0 0 600 420" aria-hidden="true">
-  <defs><linearGradient id={id+'paint'} x2=".2" y2="1"><stop stopColor="#fff" stopOpacity=".55"/><stop offset=".5" stopColor={color}/><stop offset="1" stopColor="#10282c" stopOpacity=".5"/></linearGradient><linearGradient id={id+'visor'} x2="1" y2="1"><stop stopColor="#9af8e6"/><stop offset=".35" stopColor="#244f61"/><stop offset="1" stopColor="#081f2b"/></linearGradient></defs>
+  <defs><clipPath id={id+'face'}><ellipse cx="260" cy="149" rx="49" ry="49"/></clipPath><linearGradient id={id+'paint'} x2=".2" y2="1"><stop stopColor="#fff" stopOpacity=".55"/><stop offset=".5" stopColor={color}/><stop offset="1" stopColor="#10282c" stopOpacity=".5"/></linearGradient><linearGradient id={id+'visor'} x2="1" y2="1"><stop stopColor="#9af8e6"/><stop offset=".35" stopColor="#244f61"/><stop offset="1" stopColor="#081f2b"/></linearGradient></defs>
   <ellipse cx="308" cy="350" rx="222" ry="28" fill="#09282e" opacity=".16"/>
   <g stroke="#102e35" strokeWidth="6" strokeLinejoin="round">
    <path d="m117 174 181-48 73 24-178 52z" fill={color}/><path d="m117 174 76 28v20l-76-26z" fill="#183a42"/><path d="m157 202 8 38m155-72 9 36" fill="none" strokeWidth="12"/>
@@ -22,6 +22,7 @@ export function KartArt({color='#ff6748',number=1}:{color?:string;number?:number
    <path d="M203 168c-9-40 7-72 42-76 37-5 70 24 69 62l-7 26-51 22-42-15z" fill={'url(#'+id+'paint)'}/>
    <path d="m235 99 22-5 24 89-24 9z" fill="#fff3d2" stroke="none"/>
    <path d="M220 144c25 3 65-3 92-13l-1 33c-22 13-55 21-85 16z" fill={'url(#'+id+'visor)'}/><path d="m234 151 37-4" fill="none" stroke="#b5fff0" strokeWidth="4"/>
+   {photo&&<g stroke="none"><ellipse cx="260" cy="149" rx="53" ry="53" fill="#fff4d9"/><image href={photo} x="211" y="100" width="98" height="98" clipPath={'url(#'+id+'face)'}/></g>}
    <path d="m288 277 57-30 128 35 20 35-171 60-52-35z" fill={color}/><path d="m288 277 57-30 128 35 20 35-171 60-52-35z" fill={'url(#'+id+'paint)'}/>
    <path d="m357 253 26 7-58 103-27-7z" fill="#fff4d9" stroke="none"/>
    <path d="m286 327 43 18 169-56 20 21-185 69-58-22z" fill="#c6ded7"/>

@@ -6,7 +6,7 @@ export type Mode='versus'|'solo'|'practice'|'tutorial';
 export type Difficulty='easy'|'normal'|'hard';
 export type Input={steer:number;drift:boolean;boost:boolean;item:boolean;tracked:boolean};
 export const neutral=():Input=>({steer:0,drift:false,boost:false,item:false,tracked:true});
-export type PlayerConfig={name:string;color:string;mode:'keyboard'|'camera'};
+export type PlayerConfig={name:string;color:string;mode:'keyboard'|'camera';photo?:string};
 export const defaults:PlayerConfig[]=[{name:'Player 1',color:'#ff6748',mode:'keyboard'},{name:'Player 2',color:'#40dfd0',mode:'keyboard'}];
 export const TRACK_LENGTH=1160,ROAD_HALF=9;
 export const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
