@@ -36,6 +36,23 @@ export class IslandScene {
  // Larger grandstands anchor the horizon and give the fans a clear silhouette from the chase camera.
  const standBase=new THREE.BoxGeometry(20,.8,5),standTier=new THREE.BoxGeometry(18,.55,3.8),roofGeo=new THREE.BoxGeometry(22,.55,5.8),postGeo=new THREE.BoxGeometry(.35,7,.35);
  for(let i=0;i<4;i++){const distance=210+i*250,side=i%2?1:-1;const {p,tangent}=this.point(distance,side*30);const heading=Math.atan2(tangent.x,tangent.z);for(const [geo,material,y] of [[standBase,'#294b50',.8],[standTier,'#426a68',1.65],[standTier,'#517d73',2.35]] as const){const tier=this.mesh(geo,material,this.scene,p.x,p.y+y,p.z);tier.rotation.y=heading;}const roof=this.mesh(roofGeo,i%2?'#f16a49':'#d8ed83',this.scene,p.x,p.y+7,p.z);roof.rotation.y=heading;for(const offset of [-8,8]){const {p:post}=this.point(distance+offset,side*30);this.mesh(postGeo,'#f4efd9',this.scene,post.x,post.y+3.5,post.z);}for(let row=0;row<2;row++)for(let j=0;j<7;j++){const {p:fan}=this.point(distance+(j-3)*2.2,side*(27+row*1.7));this.mesh(headGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0','#f4efd9'][j%5],this.scene,fan.x,fan.y+3.1+row*.75,fan.z);}}
+ const torsoGeo=new THREE.CapsuleGeometry(.28,.7,4,8),armGeo=new THREE.CapsuleGeometry(.11,.55,3,6),flagGeo=new THREE.BoxGeometry(4.5,.12,1.5);
+ for(let i=0;i<4;i++){const distance=210+i*250,side=i%2?1:-1;for(let row=0;row<2;row++)for(let j=0;j<7;j++){const {p:fan}=this.point(distance+(j-3)*2.2,side*(27+row*1.7));const shirt=this.mesh(torsoGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0','#f4efd9'][j%5],this.scene,fan.x,fan.y+2.48+row*.75,fan.z);shirt.scale.set(.9,1,.7);for(const direction of [-1,1]){const arm=this.mesh(armGeo,'#f4efd9',this.scene,fan.x+direction*.32,fan.y+3.05+row*.75,fan.z);arm.rotation.z=direction*(.55+(j%2)*.18);}}const {p:flag,tangent}=this.point(distance,side*30);const flagPole=this.mesh(new THREE.CylinderGeometry(.09,.09,9,6),'#f4efd9',this.scene,flag.x,flag.y+8,flag.z);const banner=this.mesh(flagGeo,i%2?'#f16a49':'#d8ed83',this.scene,flag.x,flag.y+11.3,flag.z);banner.rotation.y=Math.atan2(tangent.x,tangent.z);}
+ const closeStand=this.point(72,30);const closeHeading=Math.atan2(closeStand.tangent.x,closeStand.tangent.z);for(const [geo,material,y] of [[standBase,'#294b50',.8],[standTier,'#517d73',1.65],[standTier,'#6b9481',2.35]] as const){const tier=this.mesh(geo,material,this.scene,closeStand.p.x,closeStand.p.y+y,closeStand.p.z);tier.rotation.y=closeHeading;}const closeRoof=this.mesh(roofGeo,'#f16a49',this.scene,closeStand.p.x,closeStand.p.y+7,closeStand.p.z);closeRoof.rotation.y=closeHeading;for(let j=0;j<8;j++){const {p:fan}=this.point(72+(j-3.5)*2.2,27);this.mesh(torsoGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0'][j%4],this.scene,fan.x,fan.y+2.5,fan.z);this.mesh(headGeo,'#f4efd9',this.scene,fan.x,fan.y+3.35,fan.z);}
+ // A continuous crowd loop keeps both shoulders of the circuit alive between the hero stands.
+ // The figures are deliberately simple and varied, then merged by batchStatic() for a cheap render.
+ const crowdColors=['#f16a4c','#d8ed83','#6bb7bc','#c18af0','#f4efd9','#f6ce61'];
+ const crowdLength=this.race?.length??1160;
+ for(let i=0;i<34;i++){
+  const distance=(i+.5)*crowdLength/34;
+  for(const side of [-1,1]) for(let row=0;row<2;row++){
+   const {p:fan}=this.point(distance,side*(16+row*2.5));
+   const shirt=this.mesh(torsoGeo,crowdColors[(i+row)%crowdColors.length],this.scene,fan.x,fan.y+2.7+row*.7,fan.z);shirt.scale.set(1,1.12,.8);
+   this.mesh(headGeo,'#f4efd9',this.scene,fan.x,fan.y+3.65+row*.7,fan.z);
+   const arm=this.mesh(armGeo,'#f4efd9',this.scene,fan.x+(i%2?-.36:.36),fan.y+3.05+row*.7,fan.z);arm.rotation.z=i%2?-.82:.82;
+  }
+  if(i%4===0){const {p,tangent}=this.point(distance,22);const pole=this.mesh(new THREE.CylinderGeometry(.08,.08,5.8,6),'#f4efd9',this.scene,p.x,p.y+2.9,p.z);pole.name='crowd-banner-pole';const banner=this.mesh(flagGeo,crowdColors[(i+2)%crowdColors.length],this.scene,p.x,p.y+5.6,p.z);banner.rotation.y=Math.atan2(tangent.x,tangent.z);}
+ }
  for(let i=0;i<24;i++){const {p,tangent}=this.point(i/24*(this.race?.length??1160),15);const pole=this.mesh(new THREE.BoxGeometry(.3,4,.3),'#fff4db',this.scene,p.x,p.y+2,p.z);const sign=this.mesh(new THREE.BoxGeometry(3,1.8,.25),'#f6ce61',this.scene,p.x,p.y+4,p.z);sign.rotation.y=Math.atan2(tangent.x,tangent.z);const arrow=this.mesh(new THREE.ConeGeometry(.6,1.5,3),'#354557',sign,0,0,.2);arrow.rotation.z=-Math.PI/2;pole.name='direction';}
  const start=new THREE.Group(),{p,tangent}=this.point(0);start.position.copy(p);start.rotation.y=Math.atan2(tangent.x,tangent.z);this.scene.add(start);
  for(let x=0;x<12;x++)for(let z=0;z<3;z++)this.mesh(new THREE.BoxGeometry(1.5,.06,1.3),(x+z)%2?'#fff9e6':'#253747',start,x*1.5-8.25,.06,z*1.3);

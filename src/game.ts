@@ -43,7 +43,7 @@ export const lessons=[
 const BOOST_PAD_RATIOS=[.22,.64];
 export class Race {
  phase:Phase='menu';resumePhase:'racing'|'countdown'='racing';karts=[makeKart(0),makeKart(1)];
- mode:Mode='versus';difficulty:Difficulty='normal';trackId:TrackId='sunset';time=0;countdown=3.6;chaos=false;winner:number|null=null;
+ mode:Mode='versus';difficulty:Difficulty='normal';trackId:TrackId='sunset';laps=3;time=0;countdown=3.6;chaos=false;winner:number|null=null;
  hazards:Hazard[]=[];sequence=0;events:GameEvent[]=[];effects:Effect[]=[];pickups:Pickup[]=[];lastCount=4;
  practiceItem:Item='Turbo';lesson=0;lessonLeft=0;lessonRight=0;lessonBaseline=0;lessonStarted=0;
  aiTimer=0;aiTarget=3;aiLastJump=-10;aiLastItem=-10;
@@ -52,7 +52,7 @@ export class Race {
  get freePlay(){return this.mode==='practice'||this.mode==='tutorial';}
  get activeKarts(){return this.freePlay?this.karts.slice(0,1):this.karts;}
  get split(){return this.mode==='versus';}
- reset(options?:{mode?:Mode;trackId?:TrackId;difficulty?:Difficulty}){
+ reset(options?:{mode?:Mode;trackId?:TrackId;difficulty?:Difficulty;laps?:number}){
   if(options)Object.assign(this,options);
   this.karts=[makeKart(0),makeKart(1)];this.time=0;this.countdown=3.1;this.winner=null;this.hazards=[];this.effects=[];this.lastCount=4;this.events=[];this.sequence=0;
   this.pickups=Array.from({length:8},(_,i)=>({distance:this.length*(.085+i*.115),lane:i%2?-3:3,ready:0}));
@@ -119,12 +119,12 @@ export class Race {
    if(drifting){k.charge=Math.min(3,k.charge+dt);k.driftTime+=dt;if(!k.drifting)this.emit('drift');}
    else if(k.drifting){if(k.charge>.55){k.boost=Math.max(k.boost,.6+k.charge*.65);k.driftBoosts++;this.emit('boost',k,k.charge>2?'ULTRA DRIFT!':'DRIFT BOOST!');}k.charge=0;}k.drifting=drifting;
    const offroad=Math.abs(k.lane)>ROAD_HALF,baseSpeed=this.mode==='tutorial'?18:this.chaos?35:28;
-   const target=baseSpeed*(k.boost>0?1.65:1)*(offroad?.48:1)*(k.slow>0?.55:1)*(k.spin>0?.3:1)*(input.tracked?1:.3);
+   const target=baseSpeed*(k.boost>0?1.65:1)*(offroad?.72:1)*(k.slow>0?.55:1)*(k.spin>0?.3:1)*(input.tracked?1:.3);
    k.speed=smooth(k.speed,target,dt,k.speed<target?1.15:3.5);k.velocity=smooth(k.velocity,k.steer*(drifting?15:10)*(.4+k.speed/45),dt,drifting?3:6);
    k.lane+=k.velocity*dt;if(Math.abs(k.lane)>13){k.lane=clamp(k.lane,-13,13);k.velocity*=-.55;if(k.collisionCooldown===0){k.speed*=.7;k.collisionCooldown=.65;k.impact=.35;k.collisions++;this.emit('bump',k,'BARRIER BUMP');}}
    if(offroad)k.offroadTime+=dt;if(k.boost>0)k.boostTime+=dt;k.speedIntegral+=k.speed*3.6*dt;if(!this.freePlay&&this.rank(k)===1)k.leadTime+=dt;
    const previous=k.distance;k.distance+=k.speed*dt;k.maxSpeed=Math.max(k.maxSpeed,k.speed*3.6);const oldLap=k.lap;
-   if(advanceCheckpoints(k,previous,k.distance,this.time,this.length,this.freePlay?Infinity:3)){if(this.winner===null){this.winner=k.id;this.emit('win',k,'FINISH!');}}
+   if(advanceCheckpoints(k,previous,k.distance,this.time,this.length,this.freePlay?Infinity:this.laps)){if(this.winner===null){this.winner=k.id;this.emit('win',k,'FINISH!');}}
    else if(k.lap!==oldLap)this.emit('lap',k,this.freePlay?'LAP COMPLETE!':'LAP '+k.lap+'!');
    if(!this.freePlay)for(const box of this.pickups){const gap=Math.abs(wrap(k.distance-box.distance+this.length/2,this.length)-this.length/2);if(box.ready<=this.time&&!k.item&&gap<3.3&&Math.abs(k.lane-box.lane)<2.8){k.item=chooseItem(this.karts[1-k.id].distance-k.distance,this.random);k.pickups++;box.ready=this.time+(this.chaos?3:6);this.emit('pickup',k,k.item+' collected');}}
   }

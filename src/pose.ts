@@ -37,13 +37,13 @@ export class PoseControls {
  const base=this.baseline[i];if(!base){this.inputs[i]={...neutral(),tracked:false};return;}
  const lean=m.lean-base.lean,bodyShift=(base.x-m.x)*.8,steerSignal=lean+bodyShift;
  if(this.stage==='leaning'){this.leanLeft[i]=Math.max(this.leanLeft[i],-steerSignal);this.leanRight[i]=Math.max(this.leanRight[i],steerSignal);this.ranges[i]=Math.max(this.ranges[i],Math.abs(steerSignal));base.range=clamp(this.ranges[i],.12,.65);}
- const raw=clamp(steerSignal/base.range*sensitivity,-1,1),steer=Math.abs(raw)<.06?0:Math.sign(raw)*(Math.abs(raw)-.06)/.94;
+ const raw=clamp(steerSignal/base.range*sensitivity,-1,1),deadZone=.045,normalized=Math.abs(raw)<deadZone?0:(Math.abs(raw)-deadZone)/(1-deadZone),steer=normalized===0?0:Math.sign(raw)*Math.pow(normalized,.72);
  const squat=(m.leg<base.leg*.77&&m.hipY>base.hipY+base.torso*.12);
  const handsUp=[11,12].every((shoulder,arm)=>{const wrist=pose[15+arm];return (wrist.visibility??0)>.65&&wrist.y<m.shoulderY-base.torso*.28;});
  this.previousHip[i]=m.hipY;
  let throwing=false;const wrists:number[]=[];
  for(const [arm,[shoulder,elbow,wrist]] of [[11,13,15],[12,14,16]].entries()){const s=pose[shoulder],e=pose[elbow],w=pose[wrist];const x=(w.x-s.x)/m.torso,y=(w.y-s.y)/m.torso;wrists.push(x,y);if((w.visibility??0)<.65||(e.visibility??0)<.65)continue;const a={x:s.x-e.x,y:s.y-e.y},b={x:w.x-e.x,y:w.y-e.y};const cosine=(a.x*b.x+a.y*b.y)/(Math.hypot(a.x,a.y)*Math.hypot(b.x,b.y)+1e-6);const old=this.previousWrists[i];const velocity=old.length?Math.hypot(x-old[arm*2],y-old[arm*2+1])/dt:0;if(cosine<-.7&&Math.hypot(x,y)>1.05&&velocity>3.8&&now-this.lastThrow[i]>1500)throwing=true;}
- if(throwing)this.lastThrow[i]=now;this.previousWrists[i]=wrists;this.inputs[i]={steer:smooth(this.inputs[i].steer,steer,dt,12),drift:false,boost:handsUp,item:squat,tracked:true};
+ if(throwing)this.lastThrow[i]=now;this.previousWrists[i]=wrists;this.inputs[i]={steer:smooth(this.inputs[i].steer,steer,dt,8),drift:false,boost:handsUp,item:squat,tracked:true};
  });}
  getInput(i:number,now:number){if(now-this.lastSeen[i]>350)return {...neutral(),tracked:false};const input={...this.inputs[i]};this.inputs[i].boost=false;this.inputs[i].item=false;return input;}
 }
