@@ -1,0 +1,10 @@
+.world-loading{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#102d34f5;padding:24px;color:#f5efd9}
+.world-loading-card{width:min(540px,100%);border-top:5px solid #ef805e;padding:32px 0}
+.world-loading-kicker,.world-loading-route{font:700 10px/1.4 Arial,sans-serif;letter-spacing:2px;color:#b8c5b9}
+.world-loading h2{font:900 italic clamp(34px,6vw,56px)/1.03 Arial,sans-serif;letter-spacing:-2px;margin:24px 0 16px}
+.world-loading p{font-size:15px;line-height:1.7;color:#ccd0c3;max-width:420px}
+.world-loading-line{height:3px;background:#375257;overflow:hidden;margin:32px 0 22px}
+.world-loading-line:after{content:'';display:block;background:#d6df97;width:35%;height:100%;animation:circuit-loading 1.5s ease-in-out infinite}
+@keyframes circuit-loading{from{transform:translateX(-100%)}to{transform:translateX(390%)}}
+@media(prefers-reduced-motion:reduce){.world-loading-line:after{animation:none;width:100%}}
+.reduced-motion .world-loading-line:after{animation:none;width:100%}

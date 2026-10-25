@@ -10,6 +10,7 @@ import {Settings} from './Settings';
 import {Results} from './Results';
 import {KartArt,CircuitArt,ItemArt} from './Art';
 import {CircuitShelf,CircuitBrief,ControlLegend,paintNames} from './RacePresentation';
+import './graphics.css';
 const colors=['#ff6748','#40dfd0','#b693f6','#ffcf5b','#f47bb6','#63a9ff'];
 const modeInfo:{id:Mode;title:string;detail:string}[]=[
  {id:'solo',title:'Solo race',detail:'You vs. an AI rival'},
@@ -26,6 +27,8 @@ export default function App(){
  const [mode,setMode]=useState<Mode>('solo'),[trackId,setTrackId]=useState<TrackId>('sunset'),[difficulty,setDifficulty]=useState<Difficulty>('normal'),[laps,setLaps]=useState(3),[chaos,setChaos]=useState(false);
  const [phase,setPhase]=useState<Phase>('menu'),[,refresh]=useState(0),[modal,setModal]=useState<'help'|'settings'|null>(null),[renderError,setRenderError]=useState('');
  const [announcement,setAnnouncement]=useState('');
+ const [loadingWorld,setLoadingWorld]=useState(false),[worldError,setWorldError]=useState('');
+ const loadingWorldRef=useRef(false);
  const raceRef=useRef(new Race()),audioRef=useRef(new AudioEngine()),trackerRef=useRef(new CameraTracker()),keyboardRef=useRef(new KeyboardInput());
  const race=raceRef.current,tracker=trackerRef.current,keyboard=keyboardRef.current;
  const configRef=useRef(configs),prefsRef=useRef(prefs),modalRef=useRef(modal);configRef.current=configs;prefsRef.current=prefs;modalRef.current=modal;
@@ -66,10 +69,22 @@ export default function App(){
  useEffect(()=>{sceneRef.current?.setColors(configs);saveStored('kart-chaos-players',configs.map(({photo,...p})=>p));},[configs]);
  useEffect(()=>{audioRef.current.setVolume(prefs.volume);tracker.sensitivity=prefs.sensitivity;saveStored('kart-chaos-settings',prefs);},[prefs]);
  const updatePlayer=(i:number,patch:Partial<PlayerConfig>)=>setConfigs(c=>c.map((p,j)=>i===j?{...p,...patch}:p));
- const startRace=()=>{
+ const startRace=async()=>{
+  if(loadingWorldRef.current)return;
+  loadingWorldRef.current=true;setLoadingWorld(true);setWorldError('');
   keyboard.clear();audioRef.current.start();race.chaos=chaos;race.reset({mode,trackId,difficulty,laps});
-  if(sceneRef.current?.track.id!==trackId){sceneRef.current?.dispose();try{sceneRef.current=new IslandScene(host.current!,race,configs);}catch(e){setRenderError(String(e));return;}}
-  if(sceneRef.current){sceneRef.current.setColors(configs);sceneRef.current.cameraReady=false;sceneRef.current.lastEffect=0;sceneRef.current.particles.particles.forEach(p=>p.life=0);}(document.activeElement as HTMLElement|null)?.blur();setPhase(race.phase);
+  const startingPhase=race.phase;race.phase='setup';setPhase('setup');
+  try{
+   if(sceneRef.current?.track.id!==trackId||sceneRef.current?.world.error){sceneRef.current?.dispose();sceneRef.current=new IslandScene(host.current!,race,configs);}
+   const scene=sceneRef.current!;await scene.world.ready;
+   if(scene.disposed)return;
+   if(scene.world.error)throw new Error(scene.world.error);
+   await scene.renderer.compileAsync(scene.scene,scene.cameras[0]);
+   if(scene.disposed)return;
+   scene.setColors(configs);scene.cameraReady=false;scene.lastEffect=0;scene.particles.particles.forEach(p=>p.life=0);
+   (document.activeElement as HTMLElement|null)?.blur();race.phase=startingPhase;setPhase(startingPhase);
+  }catch(error){setWorldError(error instanceof Error?error.message:'Could not load the circuit. Please retry.');}
+  finally{loadingWorldRef.current=false;setLoadingWorld(false);}
  };
  const cameraSlots=configs.map((c,i)=>c.mode==='camera'&&(i===0||mode==='versus')?i:-1).filter(i=>i>=0);
  const beginCameraCalibration=()=>{changePhase('calibration');tracker.controls.singlePlayer=mode!=='versus';tracker.controls.begin();void tracker.start();};
@@ -101,6 +116,7 @@ export default function App(){
  const lesson=lessons[race.lesson];
  return <main className={['phase-'+phase,prefs.reducedMotion?'reduced-motion':'',prefs.highContrast?'high-contrast':'',racing&&!race.split?'single-view':''].join(' ')}>
   <div ref={host} className="world"/>
+  {(loadingWorld||worldError)&&<div className="world-loading" role={worldError?'alert':'status'} aria-live="polite"><div className="world-loading-card"><span className="world-loading-kicker">KART CHAOS / THE GRAND TOUR</span><h2>{worldError?'One more pit stop.':'Opening the circuit.'}</h2><p>{worldError||'Planting the palms. Polishing the paint. Almost on the grid.'}</p>{worldError?<button className="primary" onClick={startRace}>RETRY CIRCUIT ↗</button>:<div className="world-loading-line"/>}<span className="world-loading-route">{getTrack(trackId).name.toUpperCase()}</span></div></div>}
   {renderError&&<div className="fatal" role="alert">{renderError}</div>}
   {['menu','setup','calibration'].includes(phase)&&<div className="menu-shade"/>}
   {phase==='menu'&&<div className="menu-screen">
