@@ -4,15 +4,16 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {Race,wrap,type PlayerConfig} from './game';
 import {getTrack} from './tracks';
 import {Particles} from './effects';
+import {buildWorld} from './world';
 const UP=new THREE.Vector3(0,1,0);
 export class IslandScene {
- portraits:THREE.Sprite[]=[];photoSources:(string|undefined)[]=[];disposed=false;
+ portraits:THREE.Sprite[]=[];photoSources:(string|undefined)[]=[];flags:THREE.Object3D[]=[];fanArms:THREE.Object3D[]=[];disposed=false;
  reducedMotion=false;particles!:Particles;lastEffect=0;trailTimer=0;track=getTrack('sunset');
  renderer:THREE.WebGLRenderer;scene=new THREE.Scene();cameras=[new THREE.PerspectiveCamera(65,1,.1,1800),new THREE.PerspectiveCamera(65,1,.1,1800)];curve:THREE.CatmullRomCurve3;karts:THREE.Group[]=[];wheels:THREE.Mesh[][]=[];shields:THREE.Mesh[]=[];flames:THREE.Mesh[]=[];sparks:THREE.Mesh[][]=[];boxes:THREE.Group[]=[];hazards=new Map<number,THREE.Mesh>();width=1;height=1;elapsed=0;cameraReady=false;resizeObserver:ResizeObserver;materials=new Map<string,THREE.MeshStandardMaterial>();
  constructor(public host:HTMLDivElement,public race:Race,configs:PlayerConfig[]){
  this.track=getTrack(race.trackId);
- this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));this.renderer.setClearColor(this.track.sky);this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;host.appendChild(this.renderer.domElement);this.scene.fog=new THREE.Fog(this.track.sky,220,700);
- this.scene.add(new THREE.HemisphereLight('#fff6d5','#487a6c',1.8));const sun=new THREE.DirectionalLight('#fff2ca',2.5);sun.position.set(100,180,50);this.scene.add(sun);
+ this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));this.renderer.setClearColor(this.track.sky);this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.0;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.shadowMap.autoUpdate=false;this.renderer.shadowMap.needsUpdate=true;host.appendChild(this.renderer.domElement);this.scene.fog=new THREE.Fog(this.track.id==='aurora'?'#58638e':'#b9d9de',550,1400);
+ this.scene.add(new THREE.HemisphereLight(this.track.id==='aurora'?'#a9c7ff':'#fff6df','#405e67',1.5));const sun=new THREE.DirectionalLight(this.track.id==='aurora'?'#b8ceff':'#fff0d4',2.2);sun.position.set(100,180,50);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-300;sun.shadow.camera.right=300;sun.shadow.camera.top=300;sun.shadow.camera.bottom=-300;sun.shadow.camera.far=800;sun.shadow.bias=-.0003;sun.shadow.normalBias=.35;this.scene.add(sun);
  this.curve=new THREE.CatmullRomCurve3(this.track.points.map(p=>new THREE.Vector3(...p)),true,'catmullrom',.38);
  this.buildIsland();this.particles=new Particles(this.scene);configs.forEach((c,i)=>this.makeKart(c.color,i));this.setColors(configs);this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
  }
@@ -21,42 +22,15 @@ export class IslandScene {
  point(distance:number,lane=0){const t=wrap(distance,(this.race?.length??1160))/(this.race?.length??1160),p=this.curve.getPointAt(t),tangent=this.curve.getTangentAt(t).normalize(),right=new THREE.Vector3().crossVectors(tangent,UP).normalize();return {p:p.addScaledVector(right,lane),tangent,right};}
  ribbon(inner:number,outer:number,color:string,height=0){const positions:number[]=[],indices:number[]=[];for(let i=0;i<=600;i++){for(const lane of [inner,outer]){const {p}=this.point(i/600*(this.race?.length??1160),lane);positions.push(p.x,p.y+height,p.z);}if(i<600){let a=i*2;indices.push(a,a+2,a+1,a+1,a+2,a+3);}}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();const m=this.mesh(g,color);m.material=new THREE.MeshStandardMaterial({color,roughness:1,side:THREE.DoubleSide});}
  buildIsland(){
- this.mesh(new THREE.CylinderGeometry(258,285,18,48),this.track.sand,this.scene,0,-11,0);this.mesh(new THREE.CylinderGeometry(243,257,8,48),this.track.ground,this.scene,0,-1,0);const water=this.mesh(new THREE.PlaneGeometry(4000,4000),this.track.water,this.scene,0,-20,0);water.rotation.x=-Math.PI/2;
+ buildWorld(this);
  this.ribbon(-13,13,'#dec697',-.12);this.ribbon(-9,9,this.track.road);this.ribbon(-9,-8.5,'#fff3d6',.03);this.ribbon(8.5,9,'#fff3d6',.03);
  const curbGeometry=new THREE.BoxGeometry(.9,.45,4.4),dashGeo=new THREE.BoxGeometry(.18,.04,3);
  for(let i=0;i<250;i++){for(const lane of [-10,10]){const {p,tangent}=this.point(i/250*(this.race?.length??1160),lane);const m=this.mesh(curbGeometry,i%2?'#fff4db':this.track.accent,this.scene,p.x,p.y+.2,p.z);m.rotation.y=Math.atan2(tangent.x,tangent.z);}if(i%3===0){const {p,tangent}=this.point(i/250*(this.race?.length??1160));const m=this.mesh(dashGeo,'#b3bfbd',this.scene,p.x,p.y+.06,p.z);m.rotation.y=Math.atan2(tangent.x,tangent.z);}}
  const padGeo=new THREE.BoxGeometry(11,.08,2.2);for(const ratio of [.22,.64]){const {p,tangent}=this.point((this.race?.length??1160)*ratio);const pad=this.mesh(padGeo,'#d8ed83',this.scene,p.x,p.y+.1,p.z);pad.rotation.y=Math.atan2(tangent.x,tangent.z);}
- // Deterministic, reusable low-poly palms, rocks, and spectator umbrellas.
- const trunkGeo=new THREE.CylinderGeometry(.5,.8,8,5),leafGeo=new THREE.ConeGeometry(this.track.id==='aurora'?3.5:5,this.track.id==='aurora'?6:2.5,5),rockGeo=new THREE.DodecahedronGeometry(this.track.id==='canyon'?4.5:2.5),umbrellaGeo=new THREE.ConeGeometry(4,2,8);
- for(let i=0;i<115;i++){const distance=(i*.618033%1)*(this.race?.length??1160),lane=(i%2?1:-1)*(22+(i*13%36));const {p}=this.point(distance,lane);p.y=3;if(i%4===0||this.track.id==='canyon'){const rock=this.mesh(rockGeo,this.track.id==='canyon'?'#9d554b':'#a2b8b0',this.scene,p.x,p.y,p.z);rock.scale.set(1,1+i%3*.4,1.4);}else{this.mesh(trunkGeo,'#b47a4b',this.scene,p.x,p.y+4,p.z);const leaf=this.mesh(leafGeo,i%2?'#328d67':'#4ca86e',this.scene,p.x,p.y+8,p.z);leaf.rotation.y=i;this.mesh(leafGeo,'#68b86b',this.scene,p.x,p.y+9.8,p.z).scale.setScalar(.75);}}
- for(let i=0;i<14;i++){const {p}=this.point(35+i*5,26);this.mesh(umbrellaGeo,['#ff8263','#f6cd65','#9a8bdf'][i%3],this.scene,p.x,8,p.z);this.mesh(new THREE.CylinderGeometry(.12,.12,5,5),'#fff4db',this.scene,p.x,4.5,p.z);}
- // Small trackside cheering rows make the circuit feel inhabited without adding runtime entities.
- const benchGeo=new THREE.BoxGeometry(3.8,.35,1.1),headGeo=new THREE.SphereGeometry(.38,8,6);
- for(let i=0;i<10;i++){const distance=90+i*105;const side=i%2?1:-1;const {p,tangent}=this.point(distance,side*19);const row=this.mesh(benchGeo,'#294b50',this.scene,p.x,p.y+1.4,p.z);row.rotation.y=Math.atan2(tangent.x,tangent.z);for(let j=0;j<4;j++){const {p:seat}=this.point(distance+j*1.8-2.7,side*(19+(j%2)*1.4));this.mesh(headGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0'][j],this.scene,seat.x,seat.y+2.6,seat.z);}}
- // Larger grandstands anchor the horizon and give the fans a clear silhouette from the chase camera.
- const standBase=new THREE.BoxGeometry(20,.8,5),standTier=new THREE.BoxGeometry(18,.55,3.8),roofGeo=new THREE.BoxGeometry(22,.55,5.8),postGeo=new THREE.BoxGeometry(.35,7,.35);
- for(let i=0;i<4;i++){const distance=210+i*250,side=i%2?1:-1;const {p,tangent}=this.point(distance,side*30);const heading=Math.atan2(tangent.x,tangent.z);for(const [geo,material,y] of [[standBase,'#294b50',.8],[standTier,'#426a68',1.65],[standTier,'#517d73',2.35]] as const){const tier=this.mesh(geo,material,this.scene,p.x,p.y+y,p.z);tier.rotation.y=heading;}const roof=this.mesh(roofGeo,i%2?'#f16a49':'#d8ed83',this.scene,p.x,p.y+7,p.z);roof.rotation.y=heading;for(const offset of [-8,8]){const {p:post}=this.point(distance+offset,side*30);this.mesh(postGeo,'#f4efd9',this.scene,post.x,post.y+3.5,post.z);}for(let row=0;row<2;row++)for(let j=0;j<7;j++){const {p:fan}=this.point(distance+(j-3)*2.2,side*(27+row*1.7));this.mesh(headGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0','#f4efd9'][j%5],this.scene,fan.x,fan.y+3.1+row*.75,fan.z);}}
- const torsoGeo=new THREE.CapsuleGeometry(.28,.7,4,8),armGeo=new THREE.CapsuleGeometry(.11,.55,3,6),flagGeo=new THREE.BoxGeometry(4.5,.12,1.5);
- for(let i=0;i<4;i++){const distance=210+i*250,side=i%2?1:-1;for(let row=0;row<2;row++)for(let j=0;j<7;j++){const {p:fan}=this.point(distance+(j-3)*2.2,side*(27+row*1.7));const shirt=this.mesh(torsoGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0','#f4efd9'][j%5],this.scene,fan.x,fan.y+2.48+row*.75,fan.z);shirt.scale.set(.9,1,.7);for(const direction of [-1,1]){const arm=this.mesh(armGeo,'#f4efd9',this.scene,fan.x+direction*.32,fan.y+3.05+row*.75,fan.z);arm.rotation.z=direction*(.55+(j%2)*.18);}}const {p:flag,tangent}=this.point(distance,side*30);const flagPole=this.mesh(new THREE.CylinderGeometry(.09,.09,9,6),'#f4efd9',this.scene,flag.x,flag.y+8,flag.z);const banner=this.mesh(flagGeo,i%2?'#f16a49':'#d8ed83',this.scene,flag.x,flag.y+11.3,flag.z);banner.rotation.y=Math.atan2(tangent.x,tangent.z);}
- const closeStand=this.point(72,30);const closeHeading=Math.atan2(closeStand.tangent.x,closeStand.tangent.z);for(const [geo,material,y] of [[standBase,'#294b50',.8],[standTier,'#517d73',1.65],[standTier,'#6b9481',2.35]] as const){const tier=this.mesh(geo,material,this.scene,closeStand.p.x,closeStand.p.y+y,closeStand.p.z);tier.rotation.y=closeHeading;}const closeRoof=this.mesh(roofGeo,'#f16a49',this.scene,closeStand.p.x,closeStand.p.y+7,closeStand.p.z);closeRoof.rotation.y=closeHeading;for(let j=0;j<8;j++){const {p:fan}=this.point(72+(j-3.5)*2.2,27);this.mesh(torsoGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0'][j%4],this.scene,fan.x,fan.y+2.5,fan.z);this.mesh(headGeo,'#f4efd9',this.scene,fan.x,fan.y+3.35,fan.z);}
- // A continuous crowd loop keeps both shoulders of the circuit alive between the hero stands.
- // The figures are deliberately simple and varied, then merged by batchStatic() for a cheap render.
- const crowdColors=['#f16a4c','#d8ed83','#6bb7bc','#c18af0','#f4efd9','#f6ce61'];
- const crowdLength=this.race?.length??1160;
- for(let i=0;i<34;i++){
-  const distance=(i+.5)*crowdLength/34;
-  for(const side of [-1,1]) for(let row=0;row<2;row++){
-   const {p:fan}=this.point(distance,side*(16+row*2.5));
-   const shirt=this.mesh(torsoGeo,crowdColors[(i+row)%crowdColors.length],this.scene,fan.x,fan.y+2.7+row*.7,fan.z);shirt.scale.set(1,1.12,.8);
-   this.mesh(headGeo,'#f4efd9',this.scene,fan.x,fan.y+3.65+row*.7,fan.z);
-   const arm=this.mesh(armGeo,'#f4efd9',this.scene,fan.x+(i%2?-.36:.36),fan.y+3.05+row*.7,fan.z);arm.rotation.z=i%2?-.82:.82;
-  }
-  if(i%4===0){const {p,tangent}=this.point(distance,22);const pole=this.mesh(new THREE.CylinderGeometry(.08,.08,5.8,6),'#f4efd9',this.scene,p.x,p.y+2.9,p.z);pole.name='crowd-banner-pole';const banner=this.mesh(flagGeo,crowdColors[(i+2)%crowdColors.length],this.scene,p.x,p.y+5.6,p.z);banner.rotation.y=Math.atan2(tangent.x,tangent.z);}
- }
- for(let i=0;i<24;i++){const {p,tangent}=this.point(i/24*(this.race?.length??1160),15);const pole=this.mesh(new THREE.BoxGeometry(.3,4,.3),'#fff4db',this.scene,p.x,p.y+2,p.z);const sign=this.mesh(new THREE.BoxGeometry(3,1.8,.25),'#f6ce61',this.scene,p.x,p.y+4,p.z);sign.rotation.y=Math.atan2(tangent.x,tangent.z);const arrow=this.mesh(new THREE.ConeGeometry(.6,1.5,3),'#354557',sign,0,0,.2);arrow.rotation.z=-Math.PI/2;pole.name='direction';}
  const start=new THREE.Group(),{p,tangent}=this.point(0);start.position.copy(p);start.rotation.y=Math.atan2(tangent.x,tangent.z);this.scene.add(start);
  for(let x=0;x<12;x++)for(let z=0;z<3;z++)this.mesh(new THREE.BoxGeometry(1.5,.06,1.3),(x+z)%2?'#fff9e6':'#253747',start,x*1.5-8.25,.06,z*1.3);
  for(const x of [-12,12])this.mesh(new THREE.BoxGeometry(1.3,12,1.3),'#f4eee0',start,x,6,0);this.mesh(new THREE.BoxGeometry(26,2.6,1.4),'#ff7356',start,0,12,0);
+ const startLightGeo=new THREE.SphereGeometry(.34,10,8);for(const x of [-2.2,0,2.2]){const light=this.mesh(startLightGeo,'#ff6748',start,x,10.8,.18);light.material=this.mat('#ff6748',true);}
  const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=128;const ctx=canvas.getContext('2d')!;ctx.fillStyle='#ff7356';ctx.fillRect(0,0,1024,128);ctx.fillStyle='#fff9e6';ctx.font='900 76px sans-serif';ctx.textAlign='center';ctx.fillText('KART CHAOS',512,92);const sign=new THREE.Mesh(new THREE.PlaneGeometry(23,2.8),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(canvas),side:THREE.DoubleSide}));sign.position.set(0,12,-.76);start.add(sign);
  if(this.track.id==='aurora'){for(let i=0;i<80;i++){this.mesh(new THREE.IcosahedronGeometry(.6),'#d7f6ff',this.scene,Math.sin(i*7)*400,110+(i*17%100),Math.cos(i*9)*400);}}
  this.batchStatic();
@@ -64,9 +38,9 @@ export class IslandScene {
  }
  batchStatic(){
  this.scene.updateMatrixWorld(true);const batches=new Map<THREE.Material,THREE.BufferGeometry[]>(),originals:THREE.Mesh[]=[];
- this.scene.traverse(o=>{if(o instanceof THREE.Mesh&&!Array.isArray(o.material)){const g=o.geometry.clone().applyMatrix4(o.matrixWorld);const list=batches.get(o.material)??[];list.push(g);batches.set(o.material,list);originals.push(o);}});
+ this.scene.traverse(o=>{if(o instanceof THREE.Mesh&&!o.userData.dynamic&&!Array.isArray(o.material)){const g=(o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone()).applyMatrix4(o.matrixWorld);const list=batches.get(o.material)??[];list.push(g);batches.set(o.material,list);originals.push(o);}});
  originals.forEach(o=>o.removeFromParent());const disposed=new Set<THREE.BufferGeometry>();originals.forEach(o=>{if(!disposed.has(o.geometry)){o.geometry.dispose();disposed.add(o.geometry);}});
- for(const [material,geometries] of batches){const merged=mergeGeometries(geometries,false);if(merged)this.scene.add(new THREE.Mesh(merged,material));geometries.forEach(g=>g.dispose());}
+ for(const [material,geometries] of batches){const merged=mergeGeometries(geometries,false);if(merged){const batch=new THREE.Mesh(merged,material);batch.receiveShadow=material instanceof THREE.MeshStandardMaterial;batch.castShadow=[...this.materials.values()].includes(material as THREE.MeshStandardMaterial);this.scene.add(batch);}geometries.forEach(g=>g.dispose());}
  }
  makeKart(color:string,id:number){
  const group=new THREE.Group();this.scene.add(group);this.karts.push(group);
@@ -124,6 +98,8 @@ export class IslandScene {
  });}
  resize(){this.width=this.host.clientWidth;this.height=this.host.clientHeight;this.renderer.setSize(this.width,this.height);this.cameras.forEach(c=>{c.aspect=this.width/(this.height/(this.race.split?2:1));c.updateProjectionMatrix();});}
  render(dt:number,menu=false){const animated=this.race.phase==='racing';if(animated||menu)this.elapsed+=dt;const t=this.elapsed;
+ this.flags.forEach((flag,i)=>{flag.rotation.z=Math.sin(t*2.4+i*.8)*.09;});
+ this.fanArms.forEach((arm)=>{arm.rotation.z=Number(arm.userData.baseRotationZ)+Math.sin(t*3.1+Number(arm.userData.phase))*.16;});
  this.trailTimer+=dt;const trail=this.trailTimer>.045;if(trail)this.trailTimer=0;
  for(const effect of this.race.effects)if(effect.id>this.lastEffect){const {p}=this.point(effect.distance,effect.lane);p.y+=1;this.particles.emit(p,effect.type==='hit'?'#ff7356':effect.type==='boost'?'#74eaff':'#ffcf69',this.reducedMotion?4:22,effect.type==='hit'?12:6,.8);this.lastEffect=effect.id;}
  this.particles.update(animated?dt:0);
