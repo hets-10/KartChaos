@@ -25,10 +25,17 @@ export class IslandScene {
  this.ribbon(-13,13,'#dec697',-.12);this.ribbon(-9,9,this.track.road);this.ribbon(-9,-8.5,'#fff3d6',.03);this.ribbon(8.5,9,'#fff3d6',.03);
  const curbGeometry=new THREE.BoxGeometry(.9,.45,4.4),dashGeo=new THREE.BoxGeometry(.18,.04,3);
  for(let i=0;i<250;i++){for(const lane of [-10,10]){const {p,tangent}=this.point(i/250*(this.race?.length??1160),lane);const m=this.mesh(curbGeometry,i%2?'#fff4db':this.track.accent,this.scene,p.x,p.y+.2,p.z);m.rotation.y=Math.atan2(tangent.x,tangent.z);}if(i%3===0){const {p,tangent}=this.point(i/250*(this.race?.length??1160));const m=this.mesh(dashGeo,'#b3bfbd',this.scene,p.x,p.y+.06,p.z);m.rotation.y=Math.atan2(tangent.x,tangent.z);}}
+ const padGeo=new THREE.BoxGeometry(11,.08,2.2);for(const ratio of [.22,.64]){const {p,tangent}=this.point((this.race?.length??1160)*ratio);const pad=this.mesh(padGeo,'#d8ed83',this.scene,p.x,p.y+.1,p.z);pad.rotation.y=Math.atan2(tangent.x,tangent.z);}
  // Deterministic, reusable low-poly palms, rocks, and spectator umbrellas.
  const trunkGeo=new THREE.CylinderGeometry(.5,.8,8,5),leafGeo=new THREE.ConeGeometry(this.track.id==='aurora'?3.5:5,this.track.id==='aurora'?6:2.5,5),rockGeo=new THREE.DodecahedronGeometry(this.track.id==='canyon'?4.5:2.5),umbrellaGeo=new THREE.ConeGeometry(4,2,8);
  for(let i=0;i<115;i++){const distance=(i*.618033%1)*(this.race?.length??1160),lane=(i%2?1:-1)*(22+(i*13%36));const {p}=this.point(distance,lane);p.y=3;if(i%4===0||this.track.id==='canyon'){const rock=this.mesh(rockGeo,this.track.id==='canyon'?'#9d554b':'#a2b8b0',this.scene,p.x,p.y,p.z);rock.scale.set(1,1+i%3*.4,1.4);}else{this.mesh(trunkGeo,'#b47a4b',this.scene,p.x,p.y+4,p.z);const leaf=this.mesh(leafGeo,i%2?'#328d67':'#4ca86e',this.scene,p.x,p.y+8,p.z);leaf.rotation.y=i;this.mesh(leafGeo,'#68b86b',this.scene,p.x,p.y+9.8,p.z).scale.setScalar(.75);}}
  for(let i=0;i<14;i++){const {p}=this.point(35+i*5,26);this.mesh(umbrellaGeo,['#ff8263','#f6cd65','#9a8bdf'][i%3],this.scene,p.x,8,p.z);this.mesh(new THREE.CylinderGeometry(.12,.12,5,5),'#fff4db',this.scene,p.x,4.5,p.z);}
+ // Small trackside cheering rows make the circuit feel inhabited without adding runtime entities.
+ const benchGeo=new THREE.BoxGeometry(3.8,.35,1.1),headGeo=new THREE.SphereGeometry(.38,8,6);
+ for(let i=0;i<10;i++){const distance=90+i*105;const side=i%2?1:-1;const {p,tangent}=this.point(distance,side*19);const row=this.mesh(benchGeo,'#294b50',this.scene,p.x,p.y+1.4,p.z);row.rotation.y=Math.atan2(tangent.x,tangent.z);for(let j=0;j<4;j++){const {p:seat}=this.point(distance+j*1.8-2.7,side*(19+(j%2)*1.4));this.mesh(headGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0'][j],this.scene,seat.x,seat.y+2.6,seat.z);}}
+ // Larger grandstands anchor the horizon and give the fans a clear silhouette from the chase camera.
+ const standBase=new THREE.BoxGeometry(20,.8,5),standTier=new THREE.BoxGeometry(18,.55,3.8),roofGeo=new THREE.BoxGeometry(22,.55,5.8),postGeo=new THREE.BoxGeometry(.35,7,.35);
+ for(let i=0;i<4;i++){const distance=210+i*250,side=i%2?1:-1;const {p,tangent}=this.point(distance,side*30);const heading=Math.atan2(tangent.x,tangent.z);for(const [geo,material,y] of [[standBase,'#294b50',.8],[standTier,'#426a68',1.65],[standTier,'#517d73',2.35]] as const){const tier=this.mesh(geo,material,this.scene,p.x,p.y+y,p.z);tier.rotation.y=heading;}const roof=this.mesh(roofGeo,i%2?'#f16a49':'#d8ed83',this.scene,p.x,p.y+7,p.z);roof.rotation.y=heading;for(const offset of [-8,8]){const {p:post}=this.point(distance+offset,side*30);this.mesh(postGeo,'#f4efd9',this.scene,post.x,post.y+3.5,post.z);}for(let row=0;row<2;row++)for(let j=0;j<7;j++){const {p:fan}=this.point(distance+(j-3)*2.2,side*(27+row*1.7));this.mesh(headGeo,['#f16a4c','#d8ed83','#6bb7bc','#c18af0','#f4efd9'][j%5],this.scene,fan.x,fan.y+3.1+row*.75,fan.z);}}
  for(let i=0;i<24;i++){const {p,tangent}=this.point(i/24*(this.race?.length??1160),15);const pole=this.mesh(new THREE.BoxGeometry(.3,4,.3),'#fff4db',this.scene,p.x,p.y+2,p.z);const sign=this.mesh(new THREE.BoxGeometry(3,1.8,.25),'#f6ce61',this.scene,p.x,p.y+4,p.z);sign.rotation.y=Math.atan2(tangent.x,tangent.z);const arrow=this.mesh(new THREE.ConeGeometry(.6,1.5,3),'#354557',sign,0,0,.2);arrow.rotation.z=-Math.PI/2;pole.name='direction';}
  const start=new THREE.Group(),{p,tangent}=this.point(0);start.position.copy(p);start.rotation.y=Math.atan2(tangent.x,tangent.z);this.scene.add(start);
  for(let x=0;x<12;x++)for(let z=0;z<3;z++)this.mesh(new THREE.BoxGeometry(1.5,.06,1.3),(x+z)%2?'#fff9e6':'#253747',start,x*1.5-8.25,.06,z*1.3);
@@ -62,7 +69,7 @@ export class IslandScene {
  for(const x of [-1.24,1.24])body(.1,.35,.61,x,1.5,-1.4);
  this.mesh(new RoundedBoxGeometry(.8,.8,.65,2,.18),'#fff2d4',group,0,1.55,-.08);
  const helmet=this.mesh(new THREE.SphereGeometry(.63,20,14),color,group,0,2.19,-.08);helmet.name='paint';
- this.mesh(new THREE.SphereGeometry(.645,20,10,0,Math.PI,Math.PI*.34,Math.PI*.27),'#163c4d',group,0,2.19,-.08);
+ const visor=this.mesh(new THREE.SphereGeometry(.645,20,10,0,Math.PI,Math.PI*.34,Math.PI*.27),'#163c4d',group,0,2.19,-.08);visor.name='driver-visor';
  this.mesh(new RoundedBoxGeometry(.16,.06,.74,2,.025),'#fff2d4',group,-.18,2.77,-.05);
  const steering=this.mesh(new THREE.TorusGeometry(.35,.055,6,16),'#17343d',group,0,1.55,.66);steering.rotation.x=-.5;
  for(const x of [-.4,.4]){
@@ -85,17 +92,17 @@ export class IslandScene {
  const sparks:THREE.Mesh[]=[];for(let j=0;j<12;j++){const s=this.mesh(new THREE.IcosahedronGeometry(.15),j%2?'#b9eaff':'#ffcf5a',group);s.material=this.mat(j%2?'#b9eaff':'#ffcf5a',true);sparks.push(s);}this.sparks.push(sparks);
  }
  setColors(configs:PlayerConfig[]){this.karts.forEach((g,i)=>{
-  g.traverse(o=>{if(o instanceof THREE.Mesh&&o.name==='paint')o.material=this.mat(configs[i].color);});
   const source=this.race.mode==='solo'&&i===1?undefined:configs[i].photo;
+  g.traverse(o=>{if(o instanceof THREE.Mesh&&o.name==='paint')o.material=this.mat(configs[i].color);if(o instanceof THREE.Mesh&&o.name==='driver-visor')o.visible=!source;});
   if(this.photoSources[i]===source)return;this.photoSources[i]=source;
   const prior=this.portraits[i];if(prior){prior.removeFromParent();prior.material.map?.dispose();prior.material.dispose();delete this.portraits[i];}
   if(!source)return;
   const img=new Image();img.onload=()=>{
    if(this.disposed||this.photoSources[i]!==source)return;
    const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d')!;
-   ctx.fillStyle='#fff4d9';ctx.beginPath();ctx.arc(128,128,128,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(128,128,118,0,Math.PI*2);ctx.clip();ctx.drawImage(img,10,10,236,236);
+   ctx.fillStyle='#fff4d9';ctx.beginPath();ctx.arc(128,128,127,0,Math.PI*2);ctx.fill();ctx.save();ctx.beginPath();ctx.arc(128,128,121,0,Math.PI*2);ctx.clip();ctx.drawImage(img,7,7,242,242);ctx.restore();
    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false,toneMapped:false}));sprite.position.set(0,2.75,-.08);sprite.scale.set(1.7,1.7,1);g.add(sprite);this.portraits[i]=sprite;
+   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:false,depthTest:false,depthWrite:false,toneMapped:false}));sprite.renderOrder=20;sprite.position.set(0,2.2,-.78);sprite.scale.set(1.95,1.95,1);g.add(sprite);this.portraits[i]=sprite;
   };img.src=source;
  });}
  resize(){this.width=this.host.clientWidth;this.height=this.host.clientHeight;this.renderer.setSize(this.width,this.height);this.cameras.forEach(c=>{c.aspect=this.width/(this.height/(this.race.split?2:1));c.updateProjectionMatrix();});}

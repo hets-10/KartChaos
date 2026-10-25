@@ -35,11 +35,12 @@ export function chooseItem(gap:number,random=Math.random):Item {
 }
 export const lessons=[
  {title:'Find your racing line',body:'Steer left, then right. Acceleration and road heading are automatic.'},
- {title:'Charge a drift',body:'Hold drift while steering gently for one second. Release drift to fire the boost.'},
- {title:'A little extra lift',body:'Activate a jump boost. The cooldown tells you when another is ready.'},
- {title:'Throw some chaos',body:'Use the Turbo in your item slot. Practice items refill after use.'},
- {title:'Ready for a rival',body:'You have steered, drifted, jumped, and used an item. Take those moves into a solo race.'},
+ {title:'Use your powerup',body:'Squat when a powerup is ready. Stand tall again to keep racing.'},
+ {title:'Raise the roof',body:'Put both hands up to trigger a speed boost. Watch the cooldown.'},
+ {title:'Throw some chaos',body:'Squat again when the next powerup refills. Timing wins races.'},
+ {title:'Ready for a rival',body:'You have steered, powered up, and boosted. Take those moves into a solo race.'},
 ];
+const BOOST_PAD_RATIOS=[.22,.64];
 export class Race {
  phase:Phase='menu';resumePhase:'racing'|'countdown'='racing';karts=[makeKart(0),makeKart(1)];
  mode:Mode='versus';difficulty:Difficulty='normal';trackId:TrackId='sunset';time=0;countdown=3.6;chaos=false;winner:number|null=null;
@@ -98,8 +99,8 @@ export class Race {
  updateLesson(dt:number,input:Input){
   if(this.mode!=='tutorial'||!input.tracked)return;const k=this.karts[0];let advance=false;
   if(this.lesson===0){if(input.steer<-.25)this.lessonLeft+=dt;if(input.steer>.25)this.lessonRight+=dt;advance=this.lessonLeft>.25&&this.lessonRight>.25;}
-  if(this.lesson===1)advance=k.driftBoosts>this.lessonBaseline;if(this.lesson===2)advance=k.jumps>this.lessonBaseline;if(this.lesson===3)advance=k.itemsUsed>this.lessonBaseline;
-  if(advance){this.lesson++;this.lessonStarted=this.time;this.lessonBaseline=this.lesson===1?k.driftBoosts:this.lesson===2?k.jumps:k.itemsUsed;this.emit('lesson',k,'NICE MOVE!');if(this.lesson===3)this.selectPracticeItem('Turbo');}
+  if(this.lesson===1)advance=k.itemsUsed>this.lessonBaseline;if(this.lesson===2)advance=k.jumps>this.lessonBaseline;if(this.lesson===3)advance=k.itemsUsed>this.lessonBaseline;
+  if(advance){this.lesson++;this.lessonStarted=this.time;this.lessonBaseline=this.lesson===1?k.itemsUsed:this.lesson===2?k.jumps:k.itemsUsed;this.emit('lesson',k,'NICE MOVE!');if(this.lesson===2)this.selectPracticeItem('Turbo');}
  }
  step(dt:number,inputs:Input[]){
   if(this.phase==='countdown'){this.countdown-=dt;const n=Math.min(3,Math.ceil(this.countdown));if(n!==this.lastCount){this.lastCount=n;this.emit(n<=0?'go':'count');}if(this.countdown<=0)this.phase='racing';return;}
@@ -112,6 +113,8 @@ export class Race {
    k.steer=smooth(k.steer,k.spin>0?0:steer,dt,9);k.aggression+=Math.abs(k.steer)*dt;
    if(input.boost&&!k.wasBoost&&k.cooldown===0&&input.tracked){k.boost=Math.max(k.boost,.9);k.cooldown=2.2;k.hop=.65;k.jumps++;this.emit('boost',k,'JUMP BOOST!');}k.wasBoost=input.boost;
    if(input.item&&!k.wasItem&&input.tracked)this.activate(k);k.wasItem=input.item;
+   const onPad=BOOST_PAD_RATIOS.some(ratio=>Math.abs(wrap(k.distance-this.length*ratio+this.length/2,this.length)-this.length/2)<2.2)&&Math.abs(k.lane)<7;
+   if(onPad&&k.cooldown===0&&input.tracked){k.boost=Math.max(k.boost,1.15);k.cooldown=1.4;this.emit('boost',k,'PAD BOOST!');}
    const drifting=input.tracked&&input.drift&&Math.abs(k.steer)>.16&&k.speed>8&&k.spin===0;
    if(drifting){k.charge=Math.min(3,k.charge+dt);k.driftTime+=dt;if(!k.drifting)this.emit('drift');}
    else if(k.drifting){if(k.charge>.55){k.boost=Math.max(k.boost,.6+k.charge*.65);k.driftBoosts++;this.emit('boost',k,k.charge>2?'ULTRA DRIFT!':'DRIFT BOOST!');}k.charge=0;}k.drifting=drifting;

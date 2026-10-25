@@ -15,9 +15,8 @@ export function ControlLegend({player,keys}:{player:PlayerConfig;keys:Preference
  const camera=player.mode==='camera';
  return <div className="control-legend" aria-label="Driving controls">{[
   ['Steer',camera?'LEAN':keyLabel(keys.left)+' / '+keyLabel(keys.right)],
-  ['Drift + steer',camera?'SQUAT':keyLabel(keys.drift)],
-  ['Jump boost',camera?'JUMP':keyLabel(keys.boost)],
-  ['Item',camera?'THROW':keyLabel(keys.item)],
+  ['Powerup',camera?'SQUAT':keyLabel(keys.item)],
+  ['Speed boost',camera?'HANDS UP':keyLabel(keys.boost)],
  ].map(([action,key])=><span key={action}><kbd>{key}</kbd><small>{action}</small></span>)}</div>;
 }
 export function FinishPodium({race,configs,name}:{race:Race;configs:PlayerConfig[];name:(id:number)=>string}){
